@@ -1,11 +1,13 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"sync"
 
@@ -13,6 +15,10 @@ import (
 )
 
 var (
+	minSizeStr = flag.String("min-size", "", "minimum size of a file to include in results, ie: 100MB, 2GB, etc (required)")
+	dir        = flag.String("dir", "", "file or directory to get file sizes from (required)")
+	workersNum = flag.Int("workers", runtime.GOMAXPROCS(0)*2, "number of concurrent workers, default to runtime.GOMAXPROCS * 2")
+
 	minSize uint64
 )
 
@@ -72,7 +78,8 @@ func newWorkers(stats *stats) *workers {
 
 func (w *workers) start(dir string) {
 	wg := sync.WaitGroup{}
-	for i := 0; i < 10; i++ {
+	wrks := *workersNum
+	for i := 0; i < wrks; i++ {
 		go func() {
 			for path := range w.dirCh {
 				files, err := ioutil.ReadDir(path)
@@ -111,16 +118,31 @@ func (w *workers) start(dir string) {
 	wg.Wait()
 }
 
+func usage() {
+	fmt.Println("Find files recursively from a starting directory iff the file is over a certain size.")
+	flag.PrintDefaults()
+}
+
 func main() {
-	dir := "/Users/jonathanpentecost"
+	flag.Usage = usage
+	flag.Parse()
+
+	switch "" {
+	case *minSizeStr:
+		usage()
+		return
+	case *dir:
+		usage()
+		return
+	}
 
 	var err error
-	minSize, err = humanise.ParseBytes("100MB")
+	minSize, err = humanise.ParseBytes(*minSizeStr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if err := run(dir); err != nil {
+	if err := run(*dir); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -148,6 +170,7 @@ func run(path string) error {
 
 	stats := newStats()
 	w := newWorkers(stats)
+	fmt.Printf("Looking in %q...\n", path)
 	w.start(path)
 	stats.printStats()
 	return nil
