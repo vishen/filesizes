@@ -45,3 +45,12 @@ Find files recursively from a starting directory iff the file is over a certain 
 
 https://github.com/dustin/go-humanize is being used to parse 100MB, 1GB.
 Please refer to their documentation for size conversions.
+
+### Workers
+
+Since the majority of the work done is by the kernel waiting for
+filesystem operations, the more workers won't always be better as
+there will be a lot of contention for accessing the filesystem.
+
+The best number of workers I have found is roughly 2 * num of CPUs,
+which I have set as the default.
